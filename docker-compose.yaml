@@ -1,0 +1,35 @@
+services:
+  mongo:
+    image: mongo:6.0
+    container_name: chess-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    restart: always
+
+  backend:
+    build: ./backend
+    container_name: chess-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/chess
+    depends_on:
+      - mongo
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  frontend:
+    build: ./frontend
+    container_name: chess-frontend
+    ports:
+      - "9000:9000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+volumes:
+  mongodata:
