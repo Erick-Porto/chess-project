@@ -58,43 +58,62 @@ export class ChessGame {
     this.board.placePiece(new Bishop(Color.BLACK), new Position(0, 5));
   }
 
-  public makeMove(from: Position, to: Position): void {
-    if (this.status !== 'active') {
-      throw new InvalidMoveError('Game is not active.');
-    }
+  private isMoveLegal(from: Position, to: Position): boolean {
+    const tempBoard = this.board.clone();
+    const piece = tempBoard.getPiece(from);
+    if (!piece) return false;
 
-    const piece: Piece | null = this.board.getPiece(from);
+    const capturedPiece = tempBoard.getPiece(to);
+    tempBoard.removePiece(from);
+    tempBoard.placePiece(piece, to);
+    const kingPosition = tempBoard.findKingPosition(piece.color);
+    const opponentColor = piece.color === Color.WHITE ? Color.BLACK : Color.WHITE;
+    const isInCheck = tempBoard.isPositionUnderAttack(kingPosition, opponentColor);
+    return !isInCheck;
+  }
+
+  getLegalMoves(position: Position): Position[] {
+    const piece = this.board.getPiece(position);
+    if (!piece || piece.color !== this.currentTurn) {
+      return [];
+    }
+    const possibleMoves = piece.getPossibleMoves(this.board, position);
+    return possibleMoves.filter((move) => this.isMoveLegal(position, move));
+  }
+
+  public makeMove(from: Position, to: Position): void {
+    const piece = this.board.getPiece(from);
     if (!piece) {
-      throw new InvalidMoveError(
-        `No piece at the source position. [${from.row}, ${from.col}]`,
-      );
+      throw new InvalidMoveError('No piece at the source position.');
     }
 
     if (piece.color !== this.currentTurn) {
-      throw new NotYourTurnError(`It's not ${piece.color}'s turn.`);
+      throw new NotYourTurnError('It is not your turn to move.');
     }
 
     const possibleMoves = piece.getPossibleMoves(this.board, from);
-
-    const isMovePossible = possibleMoves.some(
-      (move) => move.row === to.row && move.col === to.col,
-    );
-
-    if (!isMovePossible) {
-      throw new InvalidMoveError(
-        `The move is not valid for the ${piece.type} piece.`,
-      );
+    const isValidMove = possibleMoves.some((pos) => pos.row === to.row && pos.col === to.col);
+    if (!isValidMove) {
+      throw new InvalidMoveError('The move is not valid for the selected piece.');
     }
 
-    this.board.removePiece(from);
-    this.board.placePiece(piece, to);
-
-    this.moveHistory.push({
-      from: { row: from.row, col: from.col },
-      to: { row: to.row, col: to.col },
-    });
-
-    this.switchTurn();
+    const tempBoard = this.board.clone();
+    tempBoard.removePiece(from);
+    tempBoard.placePiece(piece, to);
+    const kingPosition = tempBoard.findKingPosition(piece.color);
+    const opponentColor = piece.color === Color.WHITE ? Color.BLACK : Color.WHITE;
+    const isInCheck = tempBoard.isPositionUnderAttack(kingPosition, opponentColor);
+    if (isInCheck) {
+      throw new InvalidMoveError('You cannot make a move that puts or leaves your king in check.');
+    } else {
+      this.board.removePiece(from);
+      this.board.placePiece(piece, to);
+      this.moveHistory.push({
+        from: { row: from.row, col: from.col },
+        to: { row: to.row, col: to.col },
+      });
+      this.switchTurn();
+    }
   }
 
   private switchTurn(): void {
@@ -124,5 +143,59 @@ export class ChessGame {
     });
 
     return game;
+  }
+
+  checkGameOver(): {isGameOver: boolean, winner?: Color | 'draw' } {
+    if(!this.hasAnyLegalMoves(this.currentTurn)) {
+      if(this.isKingInCheck(this.currentTurn)) {
+        return {isGameOver: true, winner: this.currentTurn === Color.WHITE ? Color.BLACK : Color.WHITE};
+      }
+      else{
+        return {isGameOver: true, winner: 'draw'};
+      }
+    }
+    return {isGameOver: false};
+  }
+
+  isKingInCheck(color: Color): boolean {
+    // 1. Encontra o rei (ajuste para findKingPosition se for o nome no seu Board)
+    const kingPos = this.board.findKingPosition(color); 
+    const opponentColor = color === Color.WHITE ? Color.BLACK : Color.WHITE;
+
+    // 2. Varre todas as casas para ver se algum inimigo ataca o rei
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const pos = new Position(r, c);
+        const piece = this.board.getPiece(pos);
+
+        // Se for inimigo
+        if (piece && piece.color === opponentColor) {
+          const moves = piece.getPossibleMoves(this.board, pos);
+          // Se um dos movimentos do inimigo cai em cima do Rei
+          if (moves.some(m => m.row === kingPos.row && m.col === kingPos.col)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  private hasAnyLegalMoves(color: Color): boolean {
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 8; col++) {
+        const pos = new Position(row, col);
+        const piece = this.board.getPiece(pos);
+        
+        if (piece && piece.color === color) {
+          const moves = this.getLegalMoves(pos);
+          
+          if (moves.length > 0) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 }

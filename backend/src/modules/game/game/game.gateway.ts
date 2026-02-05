@@ -72,8 +72,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    const moves = piece.getPossibleMoves(
-      room.getBoard(),
+    const moves = room.getLegalMoves(
       new Position(payload.row, payload.col),
     );
     client.emit('validMoves', moves);

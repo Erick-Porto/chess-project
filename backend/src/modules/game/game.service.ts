@@ -119,9 +119,19 @@ export class GameService {
 
     game.makeMove(from, to);
 
-    await this.gameModel
-      .updateOne({ roomId }, { $set: { moves: game.getHistory() } })
-      .exec();
+    const status = game.checkGameOver();
+    
+    if(status.isGameOver){
+      this.activeGames.delete(roomId);
+    }
+
+    const gameDoc = await this.gameModel.findOne({ roomId }).exec();
+
+    if(gameDoc){
+      gameDoc.moves = game.getHistory();
+
+      await gameDoc.save();
+    }
 
     return {
       board: game.getBoard(),
