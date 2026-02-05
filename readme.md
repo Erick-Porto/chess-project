@@ -1,4 +1,4 @@
-# Desafio Técnico: Multiplayer Chess (Sênior)
+# Desafio Técnico: Multiplayer Chess
 
 Este projeto implementa uma plataforma de Xadrez Multiplayer em tempo real, focando em escalabilidade, arquitetura limpa e resiliência.
 
