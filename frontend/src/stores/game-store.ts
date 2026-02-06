@@ -1,22 +1,30 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { socketService } from 'src/services/socket.service';
-import type { GameState, Piece } from 'src/types/chess';
+import type { GameState, Piece, MoveRecord } from 'src/types/chess'; // Importe MoveRecord
 import { Color } from 'src/types/chess';
 
 export const useGameStore = defineStore('game', () => {
+  // --- STATE ---
   const board = ref<(Piece | null)[][]>([]);
   const turn = ref<Color>(Color.WHITE);
   const roomId = ref<string>('');
   const isConnected = ref<boolean>(false);
   const errorMessage = ref<string>('');
   const myColor = ref<Color | 'spectator' | null>(null);
+
   const validMoves = ref<{ row: number; col: number }[]>([]);
   const selectedPosition = ref<{ row: number; col: number } | null>(null);
 
+  // Novos estados tipados corretamente
+  const winner = ref<string | null>(null);
+  const isGameOver = ref<boolean>(false);
+  const moveHistory = ref<MoveRecord[]>([]); // CORREÇÃO: Tipo explícito (sem any)
+
+  // --- ACTIONS ---
+
   function fetchValidMoves(row: number, col: number) {
     if (!roomId.value) return;
-    // Usa o método público do service
     socketService.getValidMoves(roomId.value, row, col);
   }
 
@@ -34,10 +42,22 @@ export const useGameStore = defineStore('game', () => {
     });
 
     socketService.onGameState((state: GameState) => {
-      if (state.board && state.board.grid) {
-        board.value = state.board.grid;
+      console.log('Received game state:', state);
+      if (state.board) {
+        board.value = state.board;
       }
+
       turn.value = state.turn;
+
+      // Mapeamento dos novos campos (Opcionais no DTO, mas garantidos na lógica)
+      winner.value = state.winner || null;
+      isGameOver.value = state.isGameOver || false;
+
+      if (state.history) {
+        moveHistory.value = state.history;
+      }
+
+      // Se for a primeira conexão ou reconexão, limpa erros
       isConnected.value = true;
       errorMessage.value = '';
     });
@@ -48,19 +68,36 @@ export const useGameStore = defineStore('game', () => {
 
     socketService.onError((err) => {
       errorMessage.value = err.message;
+      // Limpa mensagem após 5s para não poluir a UI
       setTimeout(() => {
         errorMessage.value = '';
       }, 5000);
     });
   }
+
   function makeMove(from: { col: number; row: number }, to: { col: number; row: number }) {
     if (!roomId.value) {
       errorMessage.value = 'Not connected to any room.';
       return;
     }
     socketService.move(roomId.value, from, to);
+
+    // UX: Limpa seleção imediatamente para dar feedback visual rápido
     selectedPosition.value = null;
     clearValidMoves();
+  }
+
+  function disconnect() {
+    // CORREÇÃO: Usa o método público, respeitando o encapsulamento
+    socketService.disconnect();
+
+    isConnected.value = false;
+    board.value = [];
+    moveHistory.value = [];
+    roomId.value = '';
+    myColor.value = null;
+    winner.value = null;
+    isGameOver.value = false;
   }
 
   return {
@@ -69,12 +106,16 @@ export const useGameStore = defineStore('game', () => {
     roomId,
     isConnected,
     errorMessage,
-    joinRoom,
+    myColor,
+    validMoves,
     selectedPosition,
+    winner,
+    isGameOver,
+    moveHistory,
+    joinRoom,
     clearValidMoves,
     fetchValidMoves,
     makeMove,
-    myColor,
-    validMoves,
+    disconnect,
   };
 });

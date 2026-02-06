@@ -7,7 +7,11 @@ export class Pawn extends Piece {
     super(color, PieceType.PAWN);
   }
 
-  getPossibleMoves(board: Board, current: Position): Position[] {
+  getPossibleMoves(
+    board: Board,
+    current: Position,
+    enPassantTarget?: Position | null,
+  ): Position[] {
     const moves: Position[] = [];
     const direction = this.color === Color.WHITE ? -1 : 1;
 
@@ -35,11 +39,20 @@ export class Pawn extends Piece {
     if (forwardRow >= 0 && forwardRow < 8) {
       for (const colOffset of [-1, 1]) {
         const captureCol = current.col + colOffset;
+
         if (captureCol >= 0 && captureCol < 8) {
-          const capturePos = new Position(forwardRow, captureCol);
-          const pieceAtCapture = board.getPiece(capturePos);
-          if (pieceAtCapture && this.isOpponent(pieceAtCapture)) {
-            moves.push(capturePos);
+          const targetPos = new Position(forwardRow, captureCol);
+
+          if (board.isOccupiedByOpponent(targetPos, this.color)) {
+            moves.push(targetPos);
+          }
+
+          if (
+            enPassantTarget &&
+            targetPos.row === enPassantTarget.row &&
+            targetPos.col === enPassantTarget.col
+          ) {
+            moves.push(targetPos);
           }
         }
       }

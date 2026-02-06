@@ -7,7 +7,11 @@ export class Knight extends Piece {
     super(color, PieceType.KNIGHT);
   }
 
-  getPossibleMoves(board: Board, current: Position): Position[] {
+  getPossibleMoves(
+    board: Board,
+    current: Position,
+    _enPassantTarget?: Position | null,
+  ): Position[] {
     const moves: Position[] = [];
     const knightMoves = [
       { row: -2, col: -1 },

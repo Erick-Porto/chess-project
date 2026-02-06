@@ -7,7 +7,11 @@ export class Bishop extends Piece {
     super(color, PieceType.BISHOP);
   }
 
-  getPossibleMoves(board: Board, currentPosition: Position): Position[] {
+  getPossibleMoves(
+    board: Board,
+    currentPosition: Position,
+    _enPassantTarget?: Position | null,
+  ): Position[] {
     const moves: Position[] = [];
     const knightMoves = [
       { row: -1, col: -1 },

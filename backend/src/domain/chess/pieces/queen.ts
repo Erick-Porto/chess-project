@@ -6,7 +6,11 @@ export class Queen extends Piece {
   constructor(color: Color) {
     super(color, PieceType.QUEEN);
   }
-  getPossibleMoves(board: Board, currentPosition: Position): Position[] {
+  getPossibleMoves(
+    board: Board,
+    currentPosition: Position,
+    _enPassantTarget?: Position | null,
+  ): Position[] {
     const moves: Position[] = [];
     const queenDirections = [
       { row: -1, col: -1 },

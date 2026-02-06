@@ -22,6 +22,14 @@ export interface BoardState {
 }
 
 export interface GameState {
-  board: BoardState;
+  board: (Piece | null)[][];
   turn: Color;
+  isGameOver?: boolean;
+  winner?: string | null;
+  history?: MoveRecord[];
+}
+
+export interface MoveRecord {
+  from: { row: number; col: number };
+  to: { row: number; col: number };
 }

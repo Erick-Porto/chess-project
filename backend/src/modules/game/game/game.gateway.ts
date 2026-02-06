@@ -35,26 +35,31 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { roomId: string; playerName: string },
   ) {
-    const { roomId } = payload;
-
-    client.join(roomId);
-    console.log(`Client ${client.id} joined room: ${roomId}`);
+    const { roomId, playerName } = payload;
 
     const { color, game } = await this.gameService.createOrGetGame(
       roomId,
       client.id,
-      payload.playerName,
+      playerName,
     );
 
-    console.log(`Cliente ${client.id} entrou na sala ${roomId} como ${color}`);
+    client.join(roomId);
 
-    // 2. Avisa EXCLUSIVAMENTE este cliente qual é a cor dele
+    console.log(
+      `[Client ${client.id}] ${playerName} joined room: ${roomId} as ${color}`,
+    );
+
     client.emit('playerColor', color);
+    const gameStatus = game.checkGameOver();
+    const currentState = {
+      board: game.getBoard().getGrid(), //TODO: serialize
+      turn: game.getTurn(), //TODO: serialize
+      isGameOver: gameStatus.isGameOver,
+      winner: gameStatus.winner,
+      history: game.getHistory(), //TODO: serialize
+    };
 
-    this.server.to(roomId).emit('gameState', {
-      turn: game.getTurn(), // TODO: serialize turn
-      board: game.getBoard(), // TODO: serialize board
-    });
+    client.emit('gameState', currentState);
   }
 
   @SubscribeMessage('getValidMoves')
@@ -72,9 +77,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    const moves = room.getLegalMoves(
-      new Position(payload.row, payload.col),
-    );
+    const moves = room.getLegalMoves(new Position(payload.row, payload.col));
     client.emit('validMoves', moves);
   }
 
@@ -104,7 +107,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         throw new Error('Not your turn');
       }
 
-      console.log(`Client ${client.id} making move in room: ${payload.roomId}`);
+      console.log(
+        `[Client ${client.id}] ${playerColor} making move in room: ${payload.roomId}`,
+      );
       const newState = await this.gameService.makeMove(
         payload.roomId,
         payload.from,

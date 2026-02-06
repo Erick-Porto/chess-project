@@ -7,7 +7,11 @@ export class Rook extends Piece {
     super(color, PieceType.ROOK);
   }
 
-  getPossibleMoves(board: Board, current: Position): Position[] {
+  getPossibleMoves(
+    board: Board,
+    current: Position,
+    _enPassantTarget?: Position | null,
+  ): Position[] {
     const moves: Position[] = [];
     const rookDirections = [
       { row: -1, col: 0 },

@@ -119,23 +119,26 @@ export class GameService {
 
     game.makeMove(from, to);
 
-    const status = game.checkGameOver();
-    
-    if(status.isGameOver){
+    const { isGameOver, winner } = game.checkGameOver();
+
+    if (isGameOver) {
       this.activeGames.delete(roomId);
     }
 
     const gameDoc = await this.gameModel.findOne({ roomId }).exec();
 
-    if(gameDoc){
+    if (gameDoc) {
       gameDoc.moves = game.getHistory();
 
       await gameDoc.save();
     }
 
     return {
-      board: game.getBoard(),
+      board: game.getBoard().getGrid(),
       turn: game.getTurn(),
+      isGameOver: isGameOver,
+      winner: winner,
+      history: game.getHistory(),
     };
   }
 }

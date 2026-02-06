@@ -49,7 +49,6 @@ const getSquareClass = (row: number, col: number) => {
     'bg-brown-5': isDark,
     'bg-brown-3': !isDark,
     'bg-yellow-4': isSelected,
-    'cursor-pointer': true,
     'relative-position': true,
   };
 };
