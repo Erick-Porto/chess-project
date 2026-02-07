@@ -20,7 +20,7 @@ export class Board {
     this.grid[position.row][position.col] = piece;
   }
 
-  etPiece(pos: Position): Piece | null {
+  getPiece(pos: Position): Piece | null {
     if (!this.isValidPosition(pos)) return null;
     return this.grid[pos.row][pos.col];
   }
@@ -32,11 +32,6 @@ export class Board {
   isOccupiedByOpponent(position: Position, color: Color): boolean {
     const piece = this.getPiece(position);
     return piece !== null && piece.color !== color;
-  }
-
-  getPiece(pos: Position): Piece | null {
-    if (!this.isValidPosition(pos)) return null;
-    return this.grid[pos.row][pos.col];
   }
 
   isPositionUnderAttack(position: Position, attackingColor: Color): boolean {
@@ -59,11 +54,15 @@ export class Board {
 
   movePiece(from: Position, to: Position): void {
     const piece = this.grid[from.row][from.col];
-
-    // Só move se tiver peça (segurança interna)
     if (piece) {
-      this.grid[from.row][from.col] = null; // Remove da origem
-      this.grid[to.row][to.col] = piece; // Coloca no destino (Captura implícita)
+      this.grid[from.row][from.col] = null;
+      this.grid[to.row][to.col] = piece;
+    }
+  }
+
+  removePiece(position: Position): void {
+    if (this.isValidPosition(position)) {
+      this.grid[position.row][position.col] = null;
     }
   }
 
@@ -76,7 +75,7 @@ export class Board {
         }
       }
     }
-    throw new Error(`Rei ${color} sumiu do tabuleiro! Erro crítico.`);
+    throw new Error(`${color} King not found on the board!`);
   }
 
   clone(): Board {
@@ -88,12 +87,6 @@ export class Board {
       }
     }
     return newBoard;
-  }
-
-  removePiece(position: Position): void {
-    if (this.isValidPosition(position)) {
-      this.grid[position.row][position.col] = null;
-    }
   }
 
   private isValidPosition(pos: Position): boolean {

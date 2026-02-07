@@ -20,11 +20,7 @@ export abstract class Piece {
     public readonly color: Color,
     public readonly type: PieceType,
     public hasMoved: boolean = false,
-  ) {
-    this.color = color;
-    this.type = type;
-    this.hasMoved = hasMoved;
-  }
+  ) {}
 
   abstract getPossibleMoves(
     board: Board,

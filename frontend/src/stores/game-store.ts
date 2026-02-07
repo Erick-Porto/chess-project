@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { socketService } from 'src/services/socket.service';
-import type { GameState, Piece, MoveRecord } from 'src/types/chess'; // Importe MoveRecord
+import type { GameState, Piece, MoveRecord, PieceType } from 'src/types/chess';
 import { Color } from 'src/types/chess';
 
 export const useGameStore = defineStore('game', () => {
@@ -12,14 +12,18 @@ export const useGameStore = defineStore('game', () => {
   const isConnected = ref<boolean>(false);
   const errorMessage = ref<string>('');
   const myColor = ref<Color | 'spectator' | null>(null);
-
+  const players = ref<{ white: string; black: string } | null>({ white: '', black: '' });
+  const lastMove = ref<{
+    from: { row: number; col: number };
+    to: { row: number; col: number };
+  } | null>(null);
   const validMoves = ref<{ row: number; col: number }[]>([]);
   const selectedPosition = ref<{ row: number; col: number } | null>(null);
 
   // Novos estados tipados corretamente
-  const winner = ref<string | null>(null);
+  const winner = ref<Color | null>(null);
   const isGameOver = ref<boolean>(false);
-  const moveHistory = ref<MoveRecord[]>([]); // CORREÇÃO: Tipo explícito (sem any)
+  const moveHistory = ref<MoveRecord[]>([]);
 
   // --- ACTIONS ---
 
@@ -43,8 +47,30 @@ export const useGameStore = defineStore('game', () => {
 
     socketService.onGameState((state: GameState) => {
       console.log('Received game state:', state);
-      if (state.board) {
-        board.value = state.board;
+      const rawBoard = state.board as unknown;
+      if (
+        rawBoard &&
+        typeof rawBoard === 'object' &&
+        'grid' in rawBoard &&
+        Array.isArray((rawBoard as { grid: unknown }).grid)
+      ) {
+        board.value = (rawBoard as { grid: (Piece | null)[][] }).grid;
+      }
+      // Se for um array direto, usamos ele
+      else if (Array.isArray(rawBoard)) {
+        board.value = rawBoard as (Piece | null)[][];
+      }
+      // Fallback de segurança
+      else {
+        board.value = [];
+      }
+
+      if (state.lastMove) {
+        lastMove.value = state.lastMove;
+      }
+
+      if (state.players) {
+        players.value = state.players;
       }
 
       turn.value = state.turn;
@@ -75,12 +101,16 @@ export const useGameStore = defineStore('game', () => {
     });
   }
 
-  function makeMove(from: { col: number; row: number }, to: { col: number; row: number }) {
+  function makeMove(
+    from: { col: number; row: number },
+    to: { col: number; row: number },
+    promotion?: PieceType,
+  ) {
     if (!roomId.value) {
       errorMessage.value = 'Not connected to any room.';
       return;
     }
-    socketService.move(roomId.value, from, to);
+    socketService.move(roomId.value, from, to, promotion);
 
     // UX: Limpa seleção imediatamente para dar feedback visual rápido
     selectedPosition.value = null;
@@ -116,6 +146,8 @@ export const useGameStore = defineStore('game', () => {
     clearValidMoves,
     fetchValidMoves,
     makeMove,
+    lastMove,
     disconnect,
+    players,
   };
 });

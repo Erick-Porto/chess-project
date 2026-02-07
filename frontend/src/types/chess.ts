@@ -17,19 +17,25 @@ export interface Piece {
   type: PieceType;
 }
 
-export interface BoardState {
-  grid: (Piece | null)[][];
+export interface MoveRecord {
+  from: { row: number; col: number };
+  to: { row: number; col: number };
+  notation: string;
+  promotion?: string | PieceType;
 }
 
 export interface GameState {
   board: (Piece | null)[][];
   turn: Color;
   isGameOver?: boolean;
-  winner?: string | null;
+  winner?: Color | null;
   history?: MoveRecord[];
-}
-
-export interface MoveRecord {
-  from: { row: number; col: number };
-  to: { row: number; col: number };
+  lastMove?: {
+    from: { row: number; col: number };
+    to: { row: number; col: number };
+  };
+  players?: {
+    white: string;
+    black: string;
+  };
 }

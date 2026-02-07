@@ -13,13 +13,13 @@ export class Bishop extends Piece {
     _enPassantTarget?: Position | null,
   ): Position[] {
     const moves: Position[] = [];
-    const knightMoves = [
+    const bishopDirections = [
       { row: -1, col: -1 },
       { row: -1, col: 1 },
       { row: 1, col: -1 },
       { row: 1, col: 1 },
     ];
-    for (const move of knightMoves) {
+    for (const move of bishopDirections) {
       let newRow = currentPosition.row + move.row;
       let newCol = currentPosition.col + move.col;
       while (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {

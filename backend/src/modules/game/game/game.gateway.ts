@@ -8,8 +8,9 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { GameService } from '../game.service';
+import { GameService } from './game.service';
 import { Position } from 'src/domain/chess/core/position';
+import { Color, PieceType } from 'src/domain/chess/core/piece';
 
 @WebSocketGateway({
   cors: {
@@ -36,30 +37,49 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() payload: { roomId: string; playerName: string },
   ) {
     const { roomId, playerName } = payload;
-
-    const { color, game } = await this.gameService.createOrGetGame(
-      roomId,
-      client.id,
-      playerName,
-    );
-
     client.join(roomId);
 
-    console.log(
-      `[Client ${client.id}] ${playerName} joined room: ${roomId} as ${color}`,
-    );
+    await this.gameService.createOrGetGame(roomId);
+    const gameDoc = await this.gameService.getGameDocument(roomId);
+    const gameDomain = await this.gameService.getGame(roomId);
 
+    if (!gameDoc) return;
+
+    let color: Color | 'spectator' = 'spectator';
+
+    if (gameDoc.whitePlayerName === playerName) {
+      color = Color.WHITE;
+    } else if (gameDoc.blackPlayerName === playerName) {
+      color = Color.BLACK;
+    } else if (!gameDoc.whitePlayerName) {
+      gameDoc.whitePlayerName = playerName;
+      color = Color.WHITE;
+      await this.gameService.updateGame(roomId, {
+        whitePlayerName: playerName,
+      });
+    } else if (!gameDoc.blackPlayerName) {
+      gameDoc.blackPlayerName = playerName;
+      color = Color.BLACK;
+      await this.gameService.updateGame(roomId, {
+        blackPlayerName: playerName,
+      });
+    }
+
+    (client as any).data.color = color;
     client.emit('playerColor', color);
-    const gameStatus = game.checkGameOver();
-    const currentState = {
-      board: game.getBoard().getGrid(), //TODO: serialize
-      turn: game.getTurn(), //TODO: serialize
-      isGameOver: gameStatus.isGameOver,
-      winner: gameStatus.winner,
-      history: game.getHistory(), //TODO: serialize
-    };
 
-    client.emit('gameState', currentState);
+    this.server.to(roomId).emit('gameState', {
+      board: gameDomain.getBoard().getGrid(),
+      turn: gameDomain.getTurn(),
+      isGameOver: gameDomain.isGameOver(),
+      winner: gameDomain.getWinner(),
+      history: gameDomain.getMoveHistory(),
+      lastMove: gameDomain.getLastMove(),
+      players: {
+        white: gameDoc.whitePlayerName,
+        black: gameDoc.blackPlayerName,
+      },
+    });
   }
 
   @SubscribeMessage('getValidMoves')
@@ -67,18 +87,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { roomId: string; row: number; col: number },
   ) {
-    const room = await this.gameService.getGame(payload.roomId);
-    const piece = room
-      .getBoard()
-      .getPiece(new Position(payload.row, payload.col));
-
-    if (!piece) {
+    try {
+      const room = await this.gameService.getGame(payload.roomId);
+      const moves = room.getLegalMoves(new Position(payload.row, payload.col));
+      client.emit('validMoves', moves);
+    } catch (error) {
       client.emit('validMoves', []);
-      return;
     }
-
-    const moves = room.getLegalMoves(new Position(payload.row, payload.col));
-    client.emit('validMoves', moves);
   }
 
   @SubscribeMessage('makeMove')
@@ -89,37 +104,34 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       roomId: string;
       from: { row: number; col: number };
       to: { row: number; col: number };
+      promotion?: string;
     },
   ) {
     try {
-      const playerColor = await this.gameService.getPlayerColor(
-        payload.roomId,
-        client.id,
-      );
+      const playerColor = (client as any).data.color as Color | undefined;
 
-      if (!playerColor) {
-        throw new Error('Player not part of the game');
+      if (!playerColor || playerColor === ('spectator' as any)) {
+        throw new Error('Spectators cannot move pieces.');
       }
 
       const room = await this.gameService.getGame(payload.roomId);
 
       if (playerColor !== room.getTurn()) {
-        throw new Error('Not your turn');
+        throw new Error('Not your turn.');
       }
 
-      console.log(
-        `[Client ${client.id}] ${playerColor} making move in room: ${payload.roomId}`,
-      );
+      const promotionType = payload.promotion as PieceType | undefined;
       const newState = await this.gameService.makeMove(
         payload.roomId,
         payload.from,
         payload.to,
+        promotionType,
       );
 
       this.server.to(payload.roomId).emit('gameState', newState);
-    } catch (error) {
-      console.error(error.message);
-      client.emit('error', { message: error.message });
+    } catch (error: any) {
+      console.error(`[Move Error] ${error.message}`);
+      client.emit('error', { message: error.message || 'Invalid move' });
     }
   }
 }

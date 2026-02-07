@@ -13,7 +13,7 @@ export class Knight extends Piece {
     _enPassantTarget?: Position | null,
   ): Position[] {
     const moves: Position[] = [];
-    const knightMoves = [
+    const knightDirections = [
       { row: -2, col: -1 },
       { row: -2, col: 1 },
       { row: -1, col: -2 },
@@ -24,12 +24,12 @@ export class Knight extends Piece {
       { row: 2, col: 1 },
     ];
 
-    for (const move of knightMoves) {
-      const nextRow = current.row + move.row;
-      const nextCol = current.col + move.col;
+    for (const move of knightDirections) {
+      const newRow = current.row + move.row;
+      const newCol = current.col + move.col;
 
-      if (nextRow >= 0 && nextRow < 8 && nextCol >= 0 && nextCol < 8) {
-        const nextPos = new Position(nextRow, nextCol);
+      if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
+        const nextPos = new Position(newRow, newCol);
         if (
           board.isEmpty(nextPos) ||
           board.isOccupiedByOpponent(nextPos, this.color)

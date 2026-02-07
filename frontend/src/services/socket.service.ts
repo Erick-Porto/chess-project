@@ -1,6 +1,6 @@
 import type { Socket } from 'socket.io-client';
 import { io } from 'socket.io-client';
-import type { Color, GameState } from 'src/types/chess';
+import type { Color, GameState, PieceType } from 'src/types/chess';
 
 class SocketService {
   private socket: Socket | null = null;
@@ -20,14 +20,12 @@ class SocketService {
 
   connect(roomId: string, playerName: string): void {
     if (this.socket?.connected) {
-      console.warn('Socket is already connected.');
-      return;
+      this.socket.disconnect();
     }
 
     this.socket = io(this.URL);
 
     this.socket.on('connect', () => {
-      console.log('Connected to server with ID:', this.socket?.id);
       this.joinRoom(roomId, playerName);
     });
   }
@@ -36,8 +34,13 @@ class SocketService {
     this.socket?.emit('joinRoom', { roomId, playerName });
   }
 
-  move(roomId: string, from: { col: number; row: number }, to: { col: number; row: number }): void {
-    this.socket?.emit('makeMove', { roomId, from, to });
+  move(
+    roomId: string,
+    from: { col: number; row: number },
+    to: { col: number; row: number },
+    promotion?: PieceType,
+  ): void {
+    this.socket?.emit('makeMove', { roomId, from, to, promotion });
   }
 
   onGameState(callback: (state: GameState) => void): void {

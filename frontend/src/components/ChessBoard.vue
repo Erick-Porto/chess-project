@@ -1,11 +1,10 @@
 <script lang="ts" setup>
-import { ref } from 'vue';
+import { computed } from 'vue';
 import { useGameStore } from 'src/stores/game-store';
 import { Color, PieceType } from 'src/types/chess';
 
 const store = useGameStore();
-
-const selectedPosition = ref<{ row: number; col: number } | null>(null);
+const emit = defineEmits(['promotion']);
 
 const pieceIcons: Record<string, string> = {
   [`${Color.WHITE}-${PieceType.PAWN}`]: '♙',
@@ -22,108 +21,212 @@ const pieceIcons: Record<string, string> = {
   [`${Color.BLACK}-${PieceType.KING}`]: '♚',
 };
 
-const handleSquareClick = (row: number, col: number) => {
-  const piece = store.board[row]?.[col];
+const displayGrid = computed(() => {
+  const board = store.board;
+  if (!board || board.length === 0) return [];
 
-  if (store.selectedPosition && isMoveValid(row, col)) {
-    store.makeMove(store.selectedPosition, { row, col });
+  const grid = [];
+  for (let row = 0; row < 8; row++) {
+    const rowArray = [];
+    for (let col = 0; col < 8; col++) {
+      const piece = board[row]?.[col] ?? null;
+      rowArray.push({ piece, realRow: row, realCol: col });
+    }
+    grid.push(rowArray);
+  }
+
+  if (store.myColor === Color.BLACK) {
+    grid.reverse();
+    grid.forEach((row) => row.reverse());
+  }
+
+  return grid;
+});
+
+const handleSquareClick = (realRow: number, realCol: number) => {
+  const piece = store.board[realRow]?.[realCol];
+
+  if (store.selectedPosition && isMoveValid(realRow, realCol)) {
+    const from = store.selectedPosition;
+    const to = { row: realRow, col: realCol };
+    const p = store.board[from.row]?.[from.col];
+
+    const isPawn = p?.type === PieceType.PAWN;
+    const isLastRank =
+      (p?.color === Color.WHITE && to.row === 0) || (p?.color === Color.BLACK && to.row === 7);
+
+    if (isPawn && isLastRank) {
+      emit('promotion', { from, to });
+    } else {
+      store.makeMove(from, to);
+    }
     store.clearValidMoves();
-  } else if (piece && piece.color === store.myColor && piece.color === store.turn) {
-    store.selectedPosition = { row, col };
-    store.fetchValidMoves(row, col);
+  } else if (piece && piece.color === store.myColor) {
+    if (store.turn === store.myColor) {
+      store.selectedPosition = { row: realRow, col: realCol };
+      store.fetchValidMoves(realRow, realCol);
+    }
   } else {
-    selectedPosition.value = null;
+    store.selectedPosition = null;
     store.clearValidMoves();
   }
 };
 
 const isMoveValid = (row: number, col: number) => {
-  return store.validMoves.some((move) => move.row === row && move.col === col);
+  return store.validMoves.some((m) => m.row === row && m.col === col);
 };
 
-const getSquareClass = (row: number, col: number) => {
-  const isDark = (row + col) % 2 === 1;
-  const isSelected = selectedPosition.value?.row === row && selectedPosition.value?.col === col;
+const isLastMove = (row: number, col: number) => {
+  const last = store.lastMove;
+  if (!last || !last.from || !last.to) return false;
+  return (
+    (last.from.row === row && last.from.col === col) || (last.to.row === row && last.to.col === col)
+  );
+};
 
-  return {
-    'bg-brown-5': isDark,
-    'bg-brown-3': !isDark,
-    'bg-yellow-4': isSelected,
-    'relative-position': true,
-  };
+const getSquareClass = (realRow: number, realCol: number) => {
+  const isDark = (realRow + realCol) % 2 === 1;
+  const isSelected =
+    store.selectedPosition?.row === realRow && store.selectedPosition?.col === realCol;
+  const isLast = isLastMove(realRow, realCol);
+
+  return [
+    isDark ? 'square-dark' : 'square-light',
+    isLast ? 'highlight-last' : '',
+    isSelected ? 'highlight-selected' : '',
+    'relative-position',
+    'cursor-pointer',
+    'transition-colors',
+  ];
 };
 </script>
-
+type
 <template>
-  <div class="chess-board shadow-24 rounded-borders overflow-hidden q-pa-sm">
-    <q-banner v-if="store.errorMessage" class="bg-negative text-white q-mb-sm">
+  <div class="chess-board shadow-10 rounded-borders overflow-hidden q-pa-xs bg-brown-9">
+    <q-banner v-if="store.errorMessage" dense class="bg-red text-white q-mb-xs rounded-borders">
       {{ store.errorMessage }}
     </q-banner>
 
-    <div class="board-grid" v-if="store.board.length">
-      <div class="board-row" v-for="(row, rowIndex) in store.board" :key="rowIndex">
+    <div v-if="displayGrid.length" class="board-container">
+      <div v-for="(row, rIndex) in displayGrid" :key="rIndex" class="board-row">
         <div
+          v-for="(square, cIndex) in row"
+          :key="cIndex"
           class="board-square flex flex-center"
-          v-for="(piece, colIndex) in row"
-          :key="colIndex"
-          :class="getSquareClass(rowIndex, colIndex)"
-          @click="handleSquareClick(rowIndex, colIndex)"
+          :class="getSquareClass(square.realRow, square.realCol)"
+          @click="handleSquareClick(square.realRow, square.realCol)"
         >
-          <span v-if="piece" class="text-h3 piece-icon" :class="piece.color">
-            {{ piece ? pieceIcons[`${piece.color}-${piece.type}`] : '' }}
+          <span
+            v-if="square.piece"
+            class="text-h3 piece-icon"
+            :class="square.piece.color === Color.WHITE ? 'text-white text-shadow' : 'text-black'"
+          >
+            {{ pieceIcons[`${square.piece.color}-${square.piece.type}`] }}
           </span>
-
-          <div class="valid-move-indicator" v-if="isMoveValid(rowIndex, colIndex)"></div>
+          <div v-if="isMoveValid(square.realRow, square.realCol)" class="valid-marker"></div>
         </div>
       </div>
     </div>
-
-    <div class="text-center q-pa-xl" v-else>
-      <q-spinner size="3em" color="primary" />
-      <p>Loading board...</p>
+    <div v-else class="text-center q-pa-xl text-white">
+      <q-spinner size="3em" color="yellow" />
+      <div class="q-mt-sm">Carregando tabuleiro...</div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.board-grid {
+.chess-board {
+  border-radius: 8px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  background-color: #302e2b;
+  padding: 12px;
+}
+
+.board-container {
   display: flex;
   flex-direction: column;
-  border: 5px solid #5d4037;
-  width: fit-content;
-  margin: 0 auto;
+  border-radius: 4px;
+  overflow: hidden;
 }
+
 .board-row {
   display: flex;
 }
+
 .board-square {
-  width: 12.5vmin;
-  height: 12.5vmin;
-  max-width: 80px;
-  max-height: 80px;
+  width: 10vmin;
+  height: 10vmin;
+  max-width: 65px;
+  max-height: 65px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   user-select: none;
 }
-.piece-icon.white {
-  color: #fff;
-  text-shadow: 1px 1px 2px #000;
-}
-.piece-icon.black {
-  color: #000;
-}
-.valid-move-indicator {
-  position: absolute;
-  width: 20%;
-  height: 20%;
-  border-radius: 50%;
-  background-color: rgba(255, 255, 0, 0.7);
-  top: 40%;
-  left: 40%;
+
+.square-light {
+  background-color: #ebecd0;
+  color: #ebecd0;
 }
 
-.board-square:has(.piece-icon.white, .piece-icon.black) .valid-move-indicator {
+.square-dark {
+  background-color: #779556;
+  color: #779556;
+}
+
+.piece-icon {
+  font-size: 8vmin;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4));
+}
+
+.text-white.text-shadow {
+  color: #ffffff !important;
+  text-shadow: 0 0 2px #000;
+}
+
+.text-black {
+  color: #1a1a1a !important;
+}
+
+.board-square:hover .piece-icon {
+  transform: translateY(-4px);
+}
+
+.highlight-selected {
+  background-color: rgba(255, 255, 51, 0.6) !important;
+}
+
+.highlight-last {
+  background-color: rgba(155, 199, 0, 0.5) !important;
+}
+
+.transition-colors {
+  transition: background-color 0.15s ease;
+}
+
+.valid-marker {
+  width: 25%;
+  height: 25%;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 50%;
+  position: absolute;
+}
+
+.board-square:has(.piece-icon) .valid-marker {
   background-color: transparent;
-  border: 4px solid rgba(255, 0, 0, 0.4);
-  /* width: 100%; */
-  /* height: 100%; */
+  border: 6px solid rgba(0, 0, 0, 0.15);
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+@media (min-width: 1024px) {
+  .piece-icon {
+    font-size: 50px;
+  }
 }
 </style>

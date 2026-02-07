@@ -14,7 +14,7 @@ export class King extends Piece {
     _enPassantTarget?: Position | null,
   ): Position[] {
     const moves: Position[] = [];
-    const steps = [
+    const kingDirections = [
       { row: -1, col: -1 },
       { row: -1, col: 0 },
       { row: -1, col: 1 },
@@ -25,12 +25,12 @@ export class King extends Piece {
       { row: 1, col: 1 },
     ];
 
-    for (const step of steps) {
-      const nextRow = current.row + step.row;
-      const nextCol = current.col + step.col;
+    for (const move of kingDirections) {
+      const newRow = current.row + move.row;
+      const newCol = current.col + move.col;
 
-      if (nextRow >= 0 && nextRow < 8 && nextCol >= 0 && nextCol < 8) {
-        const target = new Position(nextRow, nextCol);
+      if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
+        const target = new Position(newRow, newCol);
         if (
           board.isEmpty(target) ||
           board.isOccupiedByOpponent(target, this.color)

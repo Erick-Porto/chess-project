@@ -11,20 +11,26 @@ export class GameModel {
   @Prop()
   whiteSocketId: string;
 
-  @Prop()
-  whitePlayerName: string;
+  @Prop({ required: false })
+  whitePlayerName?: string;
 
   @Prop()
   blackSocketId: string;
 
-  @Prop()
-  blackPlayerName: string;
+  @Prop({ required: false })
+  blackPlayerName?: string;
 
-  @Prop({ default: [] })
-  moves: Array<{
-    from: { row: number; col: number };
-    to: { row: number; col: number };
-  }>;
+  @Prop({ required: false })
+  winner?: string;
+  @Prop([
+    {
+      from: { row: Number, col: Number },
+      to: { row: Number, col: Number },
+      notation: { type: String, required: false },
+      promotion: { type: String, required: false },
+    },
+  ])
+  moves: Record<string, unknown>[];
 }
 
 export const GameSchema = SchemaFactory.createForClass(GameModel);
