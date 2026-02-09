@@ -1,9 +1,46 @@
+<template>
+  <div class="chess-board shadow-10 rounded-borders overflow-hidden q-pa-xs bg-brown-9">
+    <q-banner v-if="store.errorMessage" dense class="bg-red text-white q-mb-xs rounded-borders">
+      {{ store.errorMessage }}
+    </q-banner>
+
+    <div v-if="displayGrid.length" class="board-container">
+      <div v-for="(row, rIndex) in displayGrid" :key="rIndex" class="board-row">
+        <div
+          v-for="(square, cIndex) in row"
+          :key="cIndex"
+          class="board-square flex flex-center"
+          :class="getSquareClass(square.realRow, square.realCol)"
+          @click="handleSquareClick(square.realRow, square.realCol)"
+        >
+          <span
+            v-if="square.piece"
+            class="text-h3 piece-icon"
+            :class="square.piece.color === Color.WHITE ? 'text-white text-shadow' : 'text-black'"
+          >
+            {{ pieceIcons[`${square.piece.color}-${square.piece.type}`] }}
+          </span>
+
+          <div v-if="isMoveValid(square.realRow, square.realCol)" class="valid-marker"></div>
+        </div>
+      </div>
+    </div>
+    
+    <div v-else class="text-center q-pa-xl text-white">
+      <q-spinner size="3em" color="yellow" />
+      <div class="q-mt-sm">Carregando tabuleiro...</div>
+    </div>
+  </div>
+</template>
+
 <script lang="ts" setup>
 import { computed } from 'vue';
 import { useGameStore } from 'src/stores/game-store';
 import { Color, PieceType } from 'src/types/chess';
+import { useQuasar } from 'quasar';
 
 const store = useGameStore();
+const $q = useQuasar();
 const emit = defineEmits(['promotion']);
 
 const pieceIcons: Record<string, string> = {
@@ -19,6 +56,17 @@ const pieceIcons: Record<string, string> = {
   [`${Color.BLACK}-${PieceType.BISHOP}`]: '♝',
   [`${Color.BLACK}-${PieceType.QUEEN}`]: '♛',
   [`${Color.BLACK}-${PieceType.KING}`]: '♚',
+};
+
+const showError = (msg: string) => {
+  $q.notify({
+    message: msg,
+    color: 'red-5',
+    icon: 'warning',
+    position: 'top',
+    timeout: 1500,
+    actions: [{ icon: 'close', color: 'white' }]
+  });
 };
 
 const displayGrid = computed(() => {
@@ -46,6 +94,11 @@ const displayGrid = computed(() => {
 const handleSquareClick = (realRow: number, realCol: number) => {
   const piece = store.board[realRow]?.[realCol];
 
+  if ((store.myColor as string) === 'spectator' || !store.myColor) {
+    showError('Você está apenas assistindo.');
+    return;
+  }
+
   if (store.selectedPosition && isMoveValid(realRow, realCol)) {
     const from = store.selectedPosition;
     const to = { row: realRow, col: realCol };
@@ -53,7 +106,8 @@ const handleSquareClick = (realRow: number, realCol: number) => {
 
     const isPawn = p?.type === PieceType.PAWN;
     const isLastRank =
-      (p?.color === Color.WHITE && to.row === 0) || (p?.color === Color.BLACK && to.row === 7);
+      (p?.color === Color.WHITE && to.row === 0) || 
+      (p?.color === Color.BLACK && to.row === 7);
 
     if (isPawn && isLastRank) {
       emit('promotion', { from, to });
@@ -61,15 +115,28 @@ const handleSquareClick = (realRow: number, realCol: number) => {
       store.makeMove(from, to);
     }
     store.clearValidMoves();
-  } else if (piece && piece.color === store.myColor) {
-    if (store.turn === store.myColor) {
-      store.selectedPosition = { row: realRow, col: realCol };
-      store.fetchValidMoves(realRow, realCol);
-    }
-  } else {
+    return;
+  }
+
+  
+  if (!piece) {
     store.selectedPosition = null;
     store.clearValidMoves();
+    return;
   }
+
+  if (store.turn !== store.myColor) {
+    showError("Não é sua vez de jogar!");
+    return;
+  }
+
+  if (piece.color !== store.myColor) {
+    showError('Você só pode mover suas próprias peças!');
+    return;
+  }
+
+  store.selectedPosition = { row: realRow, col: realCol };
+  store.fetchValidMoves(realRow, realCol);
 };
 
 const isMoveValid = (row: number, col: number) => {
@@ -80,7 +147,8 @@ const isLastMove = (row: number, col: number) => {
   const last = store.lastMove;
   if (!last || !last.from || !last.to) return false;
   return (
-    (last.from.row === row && last.from.col === col) || (last.to.row === row && last.to.col === col)
+    (last.from.row === row && last.from.col === col) || 
+    (last.to.row === row && last.to.col === col)
   );
 };
 
@@ -100,39 +168,6 @@ const getSquareClass = (realRow: number, realCol: number) => {
   ];
 };
 </script>
-type
-<template>
-  <div class="chess-board shadow-10 rounded-borders overflow-hidden q-pa-xs bg-brown-9">
-    <q-banner v-if="store.errorMessage" dense class="bg-red text-white q-mb-xs rounded-borders">
-      {{ store.errorMessage }}
-    </q-banner>
-
-    <div v-if="displayGrid.length" class="board-container">
-      <div v-for="(row, rIndex) in displayGrid" :key="rIndex" class="board-row">
-        <div
-          v-for="(square, cIndex) in row"
-          :key="cIndex"
-          class="board-square flex flex-center"
-          :class="getSquareClass(square.realRow, square.realCol)"
-          @click="handleSquareClick(square.realRow, square.realCol)"
-        >
-          <span
-            v-if="square.piece"
-            class="text-h3 piece-icon"
-            :class="square.piece.color === Color.WHITE ? 'text-white text-shadow' : 'text-black'"
-          >
-            {{ pieceIcons[`${square.piece.color}-${square.piece.type}`] }}
-          </span>
-          <div v-if="isMoveValid(square.realRow, square.realCol)" class="valid-marker"></div>
-        </div>
-      </div>
-    </div>
-    <div v-else class="text-center q-pa-xl text-white">
-      <q-spinner size="3em" color="yellow" />
-      <div class="q-mt-sm">Carregando tabuleiro...</div>
-    </div>
-  </div>
-</template>
 
 <style scoped>
 .chess-board {

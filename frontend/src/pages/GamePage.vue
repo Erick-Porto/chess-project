@@ -1,16 +1,6 @@
 <template>
   <q-page class="flex flex-center page-background">
     <transition name="fade">
-      <q-banner
-        v-if="store.errorMessage"
-        class="bg-red-9 text-white q-mb-md rounded-borders absolute-top shadow-10"
-        style="z-index: 5000; top: 10px; width: 90%; left: 5%"
-      >
-        <template v-slot:avatar>
-          <q-icon name="error" color="white" />
-        </template>
-        {{ store.errorMessage }}
-      </q-banner>
     </transition>
 
     <div v-if="!store.isConnected" class="text-center">
@@ -19,7 +9,9 @@
     </div>
 
     <div v-else class="row q-col-gutter-xl items-start q-pa-md layout-container">
+      
       <div class="col-12 col-md-7 flex flex-center column">
+        
         <div class="player-card glass-panel q-mb-md">
           <div class="row items-center">
             <q-avatar size="48px" class="q-mr-md shadow-2 bg-grey-3">
@@ -65,7 +57,7 @@
             >
               <span class="text-caption text-weight-bold">VEZ DE</span>
               <div class="text-h4 text-weight-bolder">
-                {{ store.turn === store.myColor ? `${myName}` : `${opponentName}` }}
+                {{ store.turn === store.myColor ? myName : opponentName }}
               </div>
             </div>
 
@@ -89,12 +81,10 @@
             <div class="row q-col-gutter-xs">
               <div v-for="(move, i) in store.moveHistory" :key="i" class="col-6">
                 <div class="move-pill">
-                  <span class="move-index">{{ Math.ceil((i + 1) / 2) }}. [{{store.turn}}]</span>
+                  <span class="move-index">{{ Math.floor(i / 2) + 1 }}.</span>
                   <span class="move-notation">
                     {{ move.notation }}
-                    <span v-if="move.promotion" class="text-amber"
-                      >={{ String(move.promotion).charAt(0).toUpperCase() }}</span
-                    >
+                    <span v-if="move.promotion" class="text-amber">={{ String(move.promotion).charAt(0).toUpperCase() }}</span>
                   </span>
                 </div>
               </div>
@@ -138,34 +128,10 @@
         <div class="text-h6 q-mb-md">Promover Peão para:</div>
 
         <div class="row q-gutter-md justify-center">
-          <q-btn
-            round
-            color="amber"
-            text-color="black"
-            size="lg"
-            @click="confirmPromotion('QUEEN')"
-            class="text-h4"
-            >♕</q-btn
-          >
-          <q-btn round color="blue-grey" size="lg" @click="confirmPromotion('ROOK')" class="text-h4"
-            >♖</q-btn
-          >
-          <q-btn
-            round
-            color="blue-grey"
-            size="lg"
-            @click="confirmPromotion('BISHOP')"
-            class="text-h4"
-            >♗</q-btn
-          >
-          <q-btn
-            round
-            color="blue-grey"
-            size="lg"
-            @click="confirmPromotion('KNIGHT')"
-            class="text-h4"
-            >♘</q-btn
-          >
+          <q-btn round color="amber" text-color="black" size="lg" @click="confirmPromotion('QUEEN')" class="text-h4">♕</q-btn>
+          <q-btn round color="blue-grey" size="lg" @click="confirmPromotion('ROOK')" class="text-h4">♖</q-btn>
+          <q-btn round color="blue-grey" size="lg" @click="confirmPromotion('BISHOP')" class="text-h4">♗</q-btn>
+          <q-btn round color="blue-grey" size="lg" @click="confirmPromotion('KNIGHT')" class="text-h4">♘</q-btn>
         </div>
       </q-card>
     </q-dialog>
@@ -176,12 +142,27 @@
 import { onMounted, computed, onUnmounted, watch, ref } from 'vue';
 import { useGameStore } from 'stores/game-store';
 import { useRoute, useRouter } from 'vue-router';
+import { useQuasar } from 'quasar';
 import ChessBoard from 'components/ChessBoard.vue';
 import { Color, type PieceType } from 'src/types/chess';
 
 const store = useGameStore();
 const route = useRoute();
 const router = useRouter();
+const $q = useQuasar();
+
+watch(() => store.errorMessage, (msg) => {
+  if (msg) {
+    $q.notify({
+      type: 'negative',
+      message: msg,
+      position: 'top',
+      timeout: 3000,
+      icon: 'error'
+    });
+    store.errorMessage = ''; 
+  }
+});
 
 const opponentName = computed(() => {
   if (store.myColor === Color.WHITE) return store.players?.black || 'Aguardando...';
@@ -340,7 +321,7 @@ onUnmounted(() => {
 .move-index {
   color: #7f8c8d;
   margin-right: 8px;
-  width: 25px;
+  width: 30px;
   display: inline-block;
   text-align: right;
 }
@@ -365,8 +346,6 @@ onUnmounted(() => {
 }
 
 @keyframes blinker {
-  50% {
-    opacity: 0;
-  }
+  50% { opacity: 0; }
 }
 </style>

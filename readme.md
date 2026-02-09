@@ -1,56 +1,150 @@
-# ♟️ Multiplayer Chess Challenge (NestJS + Vue 3)
+```markdown
+# ♟️ ChessClub Multiplayer
 
-Projeto desenvolvido para o desafio técnico de Full Stack Developer.
-Implementa um jogo de xadrez em tempo real com validação server-side autoritativa, persistência de estado e interface reativa.
+Um jogo de Xadrez Multiplayer em tempo real desenvolvido com **Vue 3** e **NestJS**, utilizando **WebSockets** para comunicação instantânea e **MongoDB** para persistência de partidas. O projeto implementa regras oficiais da FIDE, incluindo movimentos especiais como Roque, En Passant e Promoção de Peão.
 
-## 🚀 Como Rodar
+---
 
-Basta um comando para subir toda a stack (Banco, Back e Front):
+## 🚀 Tecnologias Utilizadas
+
+O projeto foi construído utilizando uma arquitetura moderna e escalável:
+
+### Frontend
+- **Framework:** Vue.js 3 (Composition API + Script Setup)
+- **Linguagem:** TypeScript
+- **Gerenciamento de Estado:** Pinia
+- **UI Framework:** Quasar Framework
+- **Estilização:** SCSS / Flexbox
+
+### Backend
+- **Framework:** NestJS
+- **Linguagem:** TypeScript
+- **Comunicação em Tempo Real:** Socket.IO (WebSockets)
+- **Banco de Dados:** MongoDB (via Mongoose)
+- **Validação:** Lógica de domínio pura (Domain-Driven Design - DDD)
+
+### Infraestrutura
+- **Containerização:** Docker & Docker Compose
+- **Ambiente:** Node.js 18+
+
+---
+
+## ✨ Funcionalidades
+
+- **Multiplayer em Tempo Real:** Movimentos sincronizados instantaneamente entre jogadores.
+- **Sistema de Salas:** Crie ou entre em salas privadas usando um ID único.
+- **Validação de Regras (Server-Side):** O backend é a autoridade máxima, impedindo movimentos ilegais.
+- **Movimentos Especiais:**
+  - ✅ Roque (Castling)
+  - ✅ En Passant
+  - ✅ Promoção de Peão (Com modal de escolha de peça)
+- **Persistência de Jogo:** O estado atual do tabuleiro é armazenado.
+- **Histórico de Movimentos:** Visualização passo a passo da partida (Notação Algébrica).
+- **Feedback Visual:** Highlight da última jogada, peças capturadas e indicação de xeque/xeque-mate.
+- **Responsividade:** Interface adaptável para diferentes tamanhos de tela.
+
+---
+
+## ⚙️ Configuração de Ambiente (.env)
+
+Para que o projeto rode corretamente via Docker (evitando erros de conexão com o Banco ou porta indefinida), é **obrigatório** criar um arquivo de variáveis de ambiente na raiz do projeto.
+
+1. Crie um arquivo chamado `.env` na **raiz do projeto** (na mesma pasta do `docker-compose.yml`).
+2. Cole o seguinte conteúdo:
+
+```env
+# Porta do Servidor Backend
+PORT=3000
+
+# Conexão com o MongoDB (uso interno do Docker)
+MONGO_URI=mongodb://mongo:27017/chess
+
+# Configuração de CORS (Permitir acesso do Frontend)
+FRONTEND_URL=*
+
+```
+
+> **Nota:** O Docker Compose lê automaticamente este arquivo para configurar os containers. Sem ele, o backend falhará ao iniciar.
+
+---
+
+## 🐳 Como Rodar (Docker)
+
+O projeto está configurado para compilar e rodar automaticamente, sem necessidade de instalar Node.js na sua máquina local.
+
+1. Certifique-se de ter o **Docker** e **Docker Compose** instalados.
+2. Na raiz do projeto, execute:
 
 ```bash
 docker-compose up --build
-Acesse:
 
-Frontend: http://localhost:9000
-
-Backend API: http://localhost:3000
 ```
 
-## 🏗️ Arquitetura e Decisões Técnicas
+> **O que este comando faz?**
+> 1. Cria os containers do Mongo, Backend e Frontend.
+> 2. Instala as dependências automaticamente.
+> 3. Compila o código TypeScript.
+> 4. Inicia os servidores.
+> 
+> 
 
-### 1. Backend: The Source of Truth (NestJS)
+### Acessando a Aplicação:
 
-A lógica do jogo reside inteiramente no servidor para evitar trapaças.
+* **Frontend (Jogo):** [http://localhost:9000](http://localhost:9000)
+* **Backend (API/Socket):** [http://localhost:3000](http://localhost:3000)
 
-- Core Domain: A pasta domain/chess contém a lógica pura do xadrez (movimentos, xeque, roque), desacoplada do framework NestJS. Isso facilita testes unitários e portabilidade.
+---
 
-- Persistência Inteligente: O estado do jogo é salvo como uma lista de movimentos (moves) no MongoDB. A cada carregamento, utilizamos o padrão Event Sourcing (Lite) para "reidratar" a partida (ChessGame.restore()). Isso garante integridade histórica e permite auditoria.
+## 🎮 Como Jogar
 
-- Concurrency: O uso de Socket.IO com salas (rooms) isola as partidas perfeitamente.
+1. Abra o navegador em `http://localhost:9000`.
+2. **Jogador 1:** Digite seu Nome e um Nome para a Sala (ex: `sala1`) e clique em "Entrar". Você será as peças **Brancas**.
+3. **Jogador 2:** Em outra aba (ou outro computador na mesma rede), digite o Nome e o **mesmo Nome da Sala** (`sala1`). Você será as peças **Pretas**.
+4. O jogo começa automaticamente!
+5. Arraste e solte as peças para jogar.
 
-### 2. Frontend: Reactive UX (Quasar + Pinia)
+---
 
-- Pinia Store: Centraliza o estado. A UI é "burra": ela apenas reflete o estado da Store e despacha intenções (makeMove).
+## 📂 Estrutura do Projeto
 
-- Socket Service: Um wrapper singleton encapsula a lógica do socket.io-client.
+```
+/
+├── backend/            # API NestJS e Lógica de Domínio (Regras do Xadrez)
+│   ├── src/
+│   │   ├── domain/     # Core Business Logic (Peças, Tabuleiro, Validações)
+│   │   ├── modules/    # Módulos NestJS (Gateway, Service, Controller)
+│   │   └── ...
+│   └── Dockerfile
+│
+├── frontend/           # Aplicação Vue 3 + Quasar
+│   ├── src/
+│   │   ├── components/ # Componentes (Tabuleiro, Peças)
+│   │   ├── pages/      # Páginas (Login, Jogo)
+│   │   ├── stores/     # Gerenciamento de Estado (Pinia)
+│   │   └── services/   # Comunicação com Socket.IO
+│   └── Dockerfile
+│
+├── docker-compose.yml  # Orquestração dos containers
+└── README.md           # Documentação
 
-## 🌟 Funcionalidades Entregues
+```
 
-✅ MVP Completo: Movimentação, turnos, capturas e validação de Xeque.
+---
 
-✅ Regras Avançadas: Roque (Castling), En Passant e Promoção de Peão (com escolha de peça).
+## 🛠️ Próximos Passos (Roadmap)
 
-✅ Detecção de Fim de Jogo: Xeque-mate e Afogamento (Stalemate).
+Funcionalidades planejadas para futuras versões:
 
-✅ Resiliência: Se o servidor reiniciar ou o usuário der F5, o jogo é restaurado exatamente de onde parou.
+* [ ] Adicionar Relógio de Xadrez (Timer com contagem regressiva).
+* [ ] Implementar Chat na sala de jogo.
+* [ ] Melhorar suporte a reconexão em redes instáveis.
 
-✅ Modo Espectador: Terceiros podem entrar na sala apenas para assistir.
+---
 
-## 🧪 Testes
+## 📄 Licença
 
-Testes unitários cobrem as regras críticas de movimentação.
+Este projeto é para fins educacionais e de portfólio.
 
-```bash
-Bash
-cd backend && npm test
+```
+
 ```

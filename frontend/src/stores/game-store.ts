@@ -5,7 +5,6 @@ import type { GameState, Piece, MoveRecord, PieceType } from 'src/types/chess';
 import { Color } from 'src/types/chess';
 
 export const useGameStore = defineStore('game', () => {
-  // --- STATE ---
   const board = ref<(Piece | null)[][]>([]);
   const turn = ref<Color>(Color.WHITE);
   const roomId = ref<string>('');
@@ -20,12 +19,9 @@ export const useGameStore = defineStore('game', () => {
   const validMoves = ref<{ row: number; col: number }[]>([]);
   const selectedPosition = ref<{ row: number; col: number } | null>(null);
 
-  // Novos estados tipados corretamente
   const winner = ref<Color | null>(null);
   const isGameOver = ref<boolean>(false);
   const moveHistory = ref<MoveRecord[]>([]);
-
-  // --- ACTIONS ---
 
   function fetchValidMoves(row: number, col: number) {
     if (!roomId.value) return;
@@ -56,11 +52,9 @@ export const useGameStore = defineStore('game', () => {
       ) {
         board.value = (rawBoard as { grid: (Piece | null)[][] }).grid;
       }
-      // Se for um array direto, usamos ele
       else if (Array.isArray(rawBoard)) {
         board.value = rawBoard as (Piece | null)[][];
       }
-      // Fallback de segurança
       else {
         board.value = [];
       }
@@ -75,7 +69,6 @@ export const useGameStore = defineStore('game', () => {
 
       turn.value = state.turn;
 
-      // Mapeamento dos novos campos (Opcionais no DTO, mas garantidos na lógica)
       winner.value = state.winner || null;
       isGameOver.value = state.isGameOver || false;
 
@@ -83,7 +76,6 @@ export const useGameStore = defineStore('game', () => {
         moveHistory.value = state.history;
       }
 
-      // Se for a primeira conexão ou reconexão, limpa erros
       isConnected.value = true;
       errorMessage.value = '';
     });
@@ -94,7 +86,6 @@ export const useGameStore = defineStore('game', () => {
 
     socketService.onError((err) => {
       errorMessage.value = err.message;
-      // Limpa mensagem após 5s para não poluir a UI
       setTimeout(() => {
         errorMessage.value = '';
       }, 5000);
@@ -112,13 +103,11 @@ export const useGameStore = defineStore('game', () => {
     }
     socketService.move(roomId.value, from, to, promotion);
 
-    // UX: Limpa seleção imediatamente para dar feedback visual rápido
     selectedPosition.value = null;
     clearValidMoves();
   }
 
   function disconnect() {
-    // CORREÇÃO: Usa o método público, respeitando o encapsulamento
     socketService.disconnect();
 
     isConnected.value = false;

@@ -7,5 +7,4 @@
 </template>
 
 <script setup lang="ts">
-// Layout limpo: sem Header, sem Drawer, sem Footer.
 </script>

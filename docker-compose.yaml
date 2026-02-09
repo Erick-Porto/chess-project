@@ -11,19 +11,29 @@ services:
     restart: always
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: chess-backend
+    restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${PORT}:${PORT}"
     environment:
-      - MONGO_URI=mongodb://mongo:27017/chess
+      - PORT=${PORT}
+      - MONGO_URI=${MONGO_URI}
+      - FRONTEND_URL=${FRONTEND_URL}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules # Garante que o node_modules do container não seja sobrescrito pelo local
+    # --- A MÁGICA ACONTECE AQUI ---
+    command: >
+      sh -c "npm install &&
+             npm run build &&
+             npm run start:prod"
     depends_on:
       - mongo
     networks:
       - chess-net
-    volumes:
-      - ./backend:/app
-      - /app/node_modules # Evita conflito com módulos locais
 
   frontend:
     build: ./frontend
