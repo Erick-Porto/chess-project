@@ -21,14 +21,18 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
+  // Mapa de sessões em memória (Socket ID -> Cor)
+  private activeSessions = new Map<string, Color | 'spectator'>();
+
   constructor(private readonly gameService: GameService) {}
 
   handleConnection(client: Socket) {
-    console.log(`Client connected: ${client.id}`);
+    console.log(`[Connection] Client connected: ${client.id}`);
   }
 
   handleDisconnect(client: Socket) {
-    console.log(`Client disconnected: ${client.id}`);
+    console.log(`[Connection] Client disconnected: ${client.id}`);
+    this.activeSessions.delete(client.id);
   }
 
   @SubscribeMessage('joinRoom')
@@ -37,37 +41,89 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() payload: { roomId: string; playerName: string },
   ) {
     const { roomId, playerName } = payload;
+
+    // 1. NORMALIZAÇÃO (A chave do sucesso)
+    // Remove espaços e força minúsculo para garantir match
+    const inputName = playerName ? playerName.trim().toLowerCase() : '';
+
     client.join(roomId);
 
+    // Garante que o jogo existe no banco/memória
     await this.gameService.createOrGetGame(roomId);
+
+    // Busca dados frescos
     const gameDoc = await this.gameService.getGameDocument(roomId);
     const gameDomain = await this.gameService.getGame(roomId);
 
     if (!gameDoc) return;
 
+    // Normaliza os nomes do banco
+    const dbWhite = gameDoc.whitePlayerName
+      ? gameDoc.whitePlayerName.trim().toLowerCase()
+      : '';
+    const dbBlack = gameDoc.blackPlayerName
+      ? gameDoc.blackPlayerName.trim().toLowerCase()
+      : '';
+
+    console.log('--- JOIN DEBUG ---');
+    console.log(`Sala: ${roomId}`);
+    console.log(`Input Jogador: "${inputName}"`);
+    console.log(`Banco White:   "${dbWhite}"`);
+    console.log(`Banco Black:   "${dbBlack}"`);
+    console.log('------------------');
+
     let color: Color | 'spectator' = 'spectator';
 
-    if (gameDoc.whitePlayerName === playerName) {
+    // --- LÓGICA DE DECISÃO BLINDADA ---
+
+    // CASO 1: Reconexão White
+    if (dbWhite && dbWhite === inputName) {
+      console.log(`✅ MATCH! ${playerName} reconhecido como WHITE (Reconexão)`);
       color = Color.WHITE;
-    } else if (gameDoc.blackPlayerName === playerName) {
+      await this.gameService.updateGame(roomId, { whiteSocketId: client.id });
+    }
+    // CASO 2: Reconexão Black
+    else if (dbBlack && dbBlack === inputName) {
+      console.log(`✅ MATCH! ${playerName} reconhecido como BLACK (Reconexão)`);
       color = Color.BLACK;
-    } else if (!gameDoc.whitePlayerName) {
-      gameDoc.whitePlayerName = playerName;
+      await this.gameService.updateGame(roomId, { blackSocketId: client.id });
+    }
+    // CASO 3: Nova Vaga White
+    else if (!dbWhite) {
+      console.log(`🆕 Vaga White livre. Atribuindo a ${playerName}`);
       color = Color.WHITE;
       await this.gameService.updateGame(roomId, {
-        whitePlayerName: playerName,
-      });
-    } else if (!gameDoc.blackPlayerName) {
-      gameDoc.blackPlayerName = playerName;
-      color = Color.BLACK;
-      await this.gameService.updateGame(roomId, {
-        blackPlayerName: playerName,
+        whitePlayerName: payload.playerName, // Salva nome original
+        whiteSocketId: client.id,
       });
     }
+    // CASO 4: Nova Vaga Black
+    else if (!dbBlack) {
+      console.log(`🆕 Vaga Black livre. Atribuindo a ${playerName}`);
+      color = Color.BLACK;
+      await this.gameService.updateGame(roomId, {
+        blackPlayerName: payload.playerName, // Salva nome original
+        blackSocketId: client.id,
+      });
+    }
+    // CASO 5: Espectador
+    else {
+      console.log(
+        `👁️ Sem vagas ou nome não bate. ${playerName} entrou como Espectador.`,
+      );
+    }
 
+    // --- REGISTRO DE SESSÃO ---
+    // Salva no Map em memória (Crucial para o makeMove)
+    this.activeSessions.set(client.id, color);
+
+    // Salva no objeto do socket também (Redundância)
     (client as any).data.color = color;
+
+    // Avisa o cliente quem ele é
     client.emit('playerColor', color);
 
+    // Emite estado atualizado
     this.server.to(roomId).emit('gameState', {
       board: gameDomain.getBoard().getGrid(),
       turn: gameDomain.getTurn(),
@@ -76,8 +132,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       history: gameDomain.getMoveHistory(),
       lastMove: gameDomain.getLastMove(),
       players: {
-        white: gameDoc.whitePlayerName,
-        black: gameDoc.blackPlayerName,
+        white: gameDoc.whitePlayerName || '',
+        black: gameDoc.blackPlayerName || '',
       },
     });
   }
@@ -108,16 +164,25 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     },
   ) {
     try {
-      const playerColor = (client as any).data.color as Color | undefined;
+      // Tenta pegar a cor de duas fontes (Redundância)
+      let playerColor = this.activeSessions.get(client.id);
 
-      if (!playerColor || playerColor === ('spectator' as any)) {
-        throw new Error('Spectators cannot move pieces.');
+      if (!playerColor) {
+        playerColor = (client as any).data.color;
+      }
+
+      console.log(`[Move Attempt] Socket: ${client.id} | Cor: ${playerColor}`);
+
+      if (!playerColor || playerColor === 'spectator') {
+        throw new Error(
+          'Player not part of the game (Identified as Spectator)',
+        );
       }
 
       const room = await this.gameService.getGame(payload.roomId);
 
       if (playerColor !== room.getTurn()) {
-        throw new Error('Not your turn.');
+        throw new Error(`Não é sua vez. Aguarde o jogador ${room.getTurn()}.`);
       }
 
       const promotionType = payload.promotion as PieceType | undefined;
@@ -131,7 +196,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.server.to(payload.roomId).emit('gameState', newState);
     } catch (error: any) {
       console.error(`[Move Error] ${error.message}`);
-      client.emit('error', { message: error.message || 'Invalid move' });
+      client.emit('error', { message: error.message || 'Erro no movimento' });
     }
   }
 }

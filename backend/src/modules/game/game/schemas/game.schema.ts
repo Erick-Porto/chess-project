@@ -22,6 +22,7 @@ export class GameModel {
 
   @Prop({ required: false })
   winner?: string;
+
   @Prop([
     {
       from: { row: Number, col: Number },

@@ -25,10 +25,9 @@ export class GameService {
     let gameDoc = await this.gameModel.findOne({ roomId }).exec();
     let gameDomain: ChessGame;
 
-    // LÓGICA DE LIMPEZA: Se o jogo já acabou, arquiva e cria um novo
     if (gameDoc && gameDoc.winner) {
       console.log(
-        `[GameService] Sala ${roomId} finalizada encontrada. Arquivando...`,
+        `[GameService] Finished game found in room ${roomId}. Archiving...`,
       );
 
       gameDoc.roomId = `${roomId}_finished_${Date.now()}`;
@@ -40,8 +39,8 @@ export class GameService {
     }
 
     if (!gameDoc) {
-      console.log(`[GameService] Criando nova sala: ${roomId}`);
-      // CORREÇÃO ANTERIOR MANTIDA: 'winner' removido para ser undefined
+      console.log(`[GameService] New room: ${roomId}`);
+
       gameDoc = await this.gameModel.create({
         roomId,
         moves: [],
@@ -109,12 +108,11 @@ export class GameService {
 
     const gameDoc = await this.gameModel.findOne({ roomId }).exec();
     if (gameDoc) {
-      // CORREÇÃO AQUI: Cast explicito para satisfazer o Record<string, unknown>
       gameDoc.moves = game.getHistory() as unknown as Record<string, unknown>[];
 
       if (status.isGameOver) {
         console.log(
-          `[GameService] Jogo em ${roomId} acabou. Vencedor: ${status.winner}`,
+          `[GameService] Game over detected in room ${roomId}. Winner: ${status.winner || 'draw'}`,
         );
         gameDoc.winner = status.winner || 'draw';
         this.activeGames.delete(roomId);
@@ -127,7 +125,7 @@ export class GameService {
       board: game.getBoard().getGrid(),
       turn: game.getTurn(),
       isGameOver: status.isGameOver,
-      winner: status.winner,
+      winner: status.winner || 'draw',
       history: game.getHistory(),
       lastMove: game.getLastMove(),
     };
