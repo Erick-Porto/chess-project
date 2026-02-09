@@ -59,27 +59,18 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       ? gameDoc.blackPlayerName.trim().toLowerCase()
       : '';
 
-    console.log('--- JOIN DEBUG ---');
-    console.log(`Sala: ${roomId}`);
-    console.log(`Input Jogador: "${inputName}"`);
-    console.log(`Banco White:   "${dbWhite}"`);
-    console.log(`Banco Black:   "${dbBlack}"`);
-    console.log('------------------');
 
     let color: Color | 'spectator' = 'spectator';
 
     if (dbWhite && dbWhite === inputName) {
-      console.log(`✅ MATCH! ${playerName} reconhecido como WHITE (Reconexão)`);
       color = Color.WHITE;
       await this.gameService.updateGame(roomId, { whiteSocketId: client.id });
     }
     else if (dbBlack && dbBlack === inputName) {
-      console.log(`✅ MATCH! ${playerName} reconhecido como BLACK (Reconexão)`);
       color = Color.BLACK;
       await this.gameService.updateGame(roomId, { blackSocketId: client.id });
     }
     else if (!dbWhite) {
-      console.log(`🆕 Vaga White livre. Atribuindo a ${playerName}`);
       color = Color.WHITE;
       await this.gameService.updateGame(roomId, {
         whitePlayerName: payload.playerName, // Salva nome original
@@ -87,17 +78,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
     }
     else if (!dbBlack) {
-      console.log(`🆕 Vaga Black livre. Atribuindo a ${playerName}`);
       color = Color.BLACK;
       await this.gameService.updateGame(roomId, {
         blackPlayerName: payload.playerName, // Salva nome original
         blackSocketId: client.id,
       });
-    }
-    else {
-      console.log(
-        `👁️ Sem vagas ou nome não bate. ${playerName} entrou como Espectador.`,
-      );
     }
 
     this.activeSessions.set(client.id, color);
@@ -163,7 +148,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const room = await this.gameService.getGame(payload.roomId);
 
       if (playerColor !== room.getTurn()) {
-        throw new Error(`Não é sua vez. Aguarde o jogador ${room.getTurn()}.`);
+        throw new Error(`Not your turn to move. Current turn: ${room.getTurn()}`);
       }
 
       const promotionType = payload.promotion as PieceType | undefined;
