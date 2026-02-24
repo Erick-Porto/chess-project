@@ -1,4 +1,4 @@
-```markdown
+
 # ♟️ ChessClub Multiplayer
 
 Um jogo de Xadrez Multiplayer em tempo real desenvolvido com **Vue 3** e **NestJS**, utilizando **WebSockets** para comunicação instantânea e **MongoDB** para persistência de partidas. O projeto implementa regras oficiais da FIDE, incluindo movimentos especiais como Roque, En Passant e Promoção de Peão.
@@ -144,7 +144,3 @@ Funcionalidades planejadas para futuras versões:
 ## 📄 Licença
 
 Este projeto é para fins educacionais e de portfólio.
-
-```
-
-```
